@@ -4,7 +4,7 @@ const sock = udp.createSocket("udp4")
 
 keepalive = Buffer.from("bf03","hex") //maybe keepalive? Host was sending this packet out after a join attempt failed, continuously, OR used to send config, idk
 // BF03 has sent:
-// Player Names => Lobby fe ff 20 (3 zeroes) 68 (first letter of name)
+// Player Names => Host fe ff 20 (3 zeroes) 68 (first letter of name)
 // Client <= Player Names ff ff 48 (3 zeroes) 6b 02 17 00 (first letter of name)
 // Level Names ff ff 1f (3 zeroes) 69 (first letter of name)
 // Game config? ff ff 23 01 (2 zeroes) 6f 00 40 25 (see full packet dump)
@@ -13,9 +13,16 @@ search = Buffer.from("bf05","hex")
 lobby = Buffer.from("bf06","hex")
 join = Buffer.from("bf07","hex")
 serverack = Buffer.from("bf08","hex") // Possibly an ack from server, sent first before lobby dump
+serverdisconnect = Buffer.from("bf09","hex") // Server => Client notification of disconnect I think
+goodbye = Buffer.from("bf0a","hex") // Client => Server notification of disconnect I think
 lobbystatus = Buffer.from("bf0b","hex")
 
 keepalivepacket = Buffer.from("bf03000000000000050000006e00000000","hex")
+let keepaliveclientpacket = fs.readFileSync("keepalive_client.bin",{encoding: null})
+fs.watchFile("keepalive_client.bin",()=>{
+	console.log("keepalive changed")
+keepaliveclientpacket = fs.readFileSync("keepalive_client.bin",{encoding: null})
+})
 searchpacket = Buffer.from("bf05190020c8a200a0175a08a0f6b578ec6bd1118c5700a0c993f0c6","hex")
 let lobbypacket = fs.readFileSync("lobby.bin",{encoding: null})
 fs.watchFile("lobby.bin",()=>{
@@ -26,9 +33,10 @@ fs.watchFile("lobby.bin",()=>{
 /*
 Byte 1-2: Packet Type
 Byte 12 and 15: Version, Digits reversed(minor first, major second), major 0 = Demo
+Byte 16-48: Lobby Identifier, For join requests this must be sent back with the two 16 byte sections reversed in order.
 Byte 77: Current Players 7 bit number, always +1? (last bit ignored)
 Byte 78: Map Byte 1
-Byte 79: Max Players BYTE
+Byte 79: Max Players Byte
 Byte 81-82: Map Bytes 2 & 3
 
 
@@ -66,11 +74,12 @@ sock.on('message',(d,rinfo)=>{
 	} else if(identifier === lobby.toString()) {
 		console.log("Found Lobby:"+d.slice(112,112+32).toString("ascii"))
 		// Here we need to send a join packet and receive the lobby dump, then begin updating on our status, continuously.
-		// We need to slice some of the data from the lobby packet and send it back, it seems.
-		// Position 16 in lobby two 16 byte sections, Position 16 in join, section order reversed.
 		clearInterval(intervals["search"])
 		generatedpacket = Buffer.concat([joinpacket.slice(0,16),d.slice(32,48),d.slice(16,32),joinpacket.slice(16+32)])
+		// join packet
 		sock.send(generatedpacket,rinfo.port,rinfo.address)
+		// Name updates don't appear to be enough to keep server up, but does appear to allow players to see you in the lobby.
+		setInterval(()=>{sock.send(keepaliveclientpacket,rinfo.port,rinfo.address),400})
 		//sentpacket = joinpacket
 	} else {
 		console.log("Unknown: ",d.slice(0,2))
