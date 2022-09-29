@@ -8,8 +8,38 @@ keepalive = Buffer.from("bf03","hex") //maybe keepalive? Host was sending this p
 // BF03 has sent:
 // Player Names => Host fe ff 20 (3 zeroes) 68 (first letter of name)
 // Client <= Player Names ff ff 48 (3 zeroes) 6b 02 17 00 (first letter of name)
-// Level Names ff ff 1f (3 zeroes) 69 (first letter of name)
+// Level Names ff ff (strlen) (3 zeroes) 69 (first letter of name)
 // Game config? ff ff 23 01 (2 zeroes) 6f 00 40 25 (see full packet dump)
+
+// BF03 Game Config:
+// Byte 15:
+	// Bit 1: Indestructible Enemy Walls
+	// Bits 2-7, a 7bit uint: Game Time Limit in Minutes, 00 = No limit, maximum time limit ingame = 127 minutes.
+// Byte 16: Bitflag, Contains: Game Speed, Mana Regeneration Rate, Fog Of War
+	// Bit 1: Fog Of War(bool)
+	// Bit 2: Mana Regen Medium (If both false, mana regen = low)
+	// Bit 3: Mana Regen High
+	// Bit 4: Step Type(bool, true = 25/75, false = 0/50)
+	// Bits 5-8: Steps (Nibble) can go up to 8 by default(400%)
+	// Examples(They're in HEX, just to make this clear):
+	// 23 = 100% Speed, Mana Regen Medium, Fog of War On
+	// 22 = 100% Speed, Mana Regen Medium, Fog of War Off
+	// 25 = 100% Speed, Mana Regen High, Fog of War On
+	// 33 = 150% Speed, Mana Regen Medium, Fog of War On
+	// 1b = 75% Speed, Mana Regen Medium, Fog of War On
+	// 2b = 125% Speed, Mana Regen Medium, Fog Of War On
+	// and so on..
+// Byte 17: Bitflag? Contains: Dungeon Heart Destroyed Reward
+	// Bit 1: Gain Mana, Gain Specials (If both false, just Gain Mana)
+	// Bit 2: Gain Mana, Gain Rooms and Land
+	// Bit 3: Gold Density Medium(If both false, density = low)
+	// Bit 4: Gold Density High
+	// Bit 5? Ticked on by default
+// Rooms, Doors, Spells, and Trap Types:
+	// 1: No
+	// 2: Research
+	// 3: Start
+
 chat = Buffer.from("bf04","hex")
 // Byte 5 = Player(00 = Red Keeper 01 = Blue Keeper etc. etc. 04 = Pink Keeper/System Message? 05 and up = Invisible to default client, still relayed by server.)
 // Byte 9 = String Length, Starts at 06, math for calculating length is (strlen*2)+6
