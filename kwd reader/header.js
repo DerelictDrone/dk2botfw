@@ -23,10 +23,12 @@ class DK2String extends String {
 }
 
 class DK2Float extends Number { // Dk2 sometimes uses fixed precision floats, this will parse them :)
-	constructor(buffer,offset) {
+	constructor(buffer,offset = 4) {
 		super(buffer.readUintLE(offset,4)/4096)
 	}
 }
+
+DK2Float.size = 4
 
 class KWDGenericHeader extends Object {
 	constructor(buffer) {
@@ -42,7 +44,7 @@ class KWDGenericHeader extends Object {
 		this.DateModified = new DK2TimeStamp(buffer.slice(38,48))
 	}
 }
-
+KWDGenericHeader.size = 48
 ArtResourceType = {
 	None: 0,
 	Sprite: 1,
@@ -80,7 +82,8 @@ class DK2ArtResource extends Object {
 		this.KeyId = buffer.readUintLE(0,4)
 		this.Type = buffer[16]
 		const type = this.Type;
-		// Now, I'm gonna go out on a teensy tiny limb and say I don't quite know how C++ unions work, but this is gonna be my best guess of how to parse the art resources since OpenKeeper(who I have been stealing from for the most part) doesn't actually HAVE this done yet! 5:42pm 9/27/2022
+		// * Now, I'm gonna go out on a teensy tiny limb and say I don't quite know how C++ unions work, but this is gonna be my best guess of how to parse the art resources since OpenKeeper(who I have been stealing from for the most part) doesn't actually HAVE this done yet! 5:42pm 9/27/2022
+		// ! Nevermind, they did have that part done, and I'm just an idiot, but it sure does look like I copied their homework  6:14AM 9/30/2022
 		if(type & (ArtResourceType.Sprite | ArtResourceType.Alpha | ArtResourceType.AdditiveAlpha) || type == ArtResourceType.None) {
 			this.Width = buffer.readUintLE(4,4)
 			this.Height = buffer.readUintLE(8,4)
@@ -93,6 +96,8 @@ class DK2ArtResource extends Object {
 			this.Fps = buffer.ReadUintLE(8,4)
 			this.StartDistance = buffer.ReadUintLE(12,2)
 			this.EndDistance = buffer.ReadUintLE(14,2)
+			this.KeyStartAf = buffer[17]
+			this.KeyEndAf = buffer[18]
 		} else if(type & ArtResourceType.ProceduralMesh) {
 			this.id = buffer.ReadUintLE(4,4)
 		} else if(type & ArtResourceType.TerrainMesh) {
@@ -100,13 +105,35 @@ class DK2ArtResource extends Object {
 			this.Unknown2 = buffer.ReadUintLE(8,4)
 			this.Frames = buffer[9]
 		}
-		this.KeyStartAf = buffer[17]
-		this.KeyEndAf = buffer[18]
 		this.SometimesOne = buffer[19]
 	}
 }
 
+class DK2Animation extends DK2ArtResource {
+	constructor(buffer) {
+		super(buffer)
+	}
+}
 
+DK2Animation.GenerateArray = function(buffer,offset,length) {
+	array = []
+	for(let i = 0; i < length; i++) {
+		array.push(new DK2Animation(buffer.slice(offset,offset+=84)))
+	}
+	return array
+}
+
+class DK2Light extends Object {
+	constructor(buffer) {
+		super()
+		this.MatrixPos = [new DK2Float(buffer),new DK2Float(buffer,4),new DK2Float(buffer,8)]
+		this.Radius = new DK2Float(buffer,12)
+		this.Flags = buffer.readUIntLE(16,4)
+		this.Color = [buffer[21],buffer[22],buffer[23],buffer[24]]
+	}
+}
+
+DK2Light.size = 25
 
 class DK2TimeStamp extends Date {
 	constructor(buffer) {
@@ -141,4 +168,4 @@ class DK2TimeStamp extends Date {
 	}
 }
 
-module.exports = {KWDGenericHeader, DK2TimeStamp, DK2ArtResource, DK2String, DK2Float}
+module.exports = {KWDGenericHeader, DK2TimeStamp, DK2ArtResource, DK2String, DK2Float, DK2Animation, DK2Light}

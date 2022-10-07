@@ -9,7 +9,7 @@ class DK2Door extends Object {
 		this.GuiIcon = new KWDHeaders.DK2ArtResource(buffer.slice(284,368))
 		this.OpenResource = new KWDHeaders.DK2ArtResource(buffer.slice(368,452))
 		this.CloseResource = new KWDHeaders.DK2ArtResource(buffer.slice(452,536))
-		this.Height = KWDHeaders.DK2Float(buffer,536)
+		this.Height = new KWDHeaders.DK2Float(buffer,536)
 		this.HealthGain = buffer.readUintLE(540,2)
 		this.Unknown1 = buffer.readUintLE(542,2)
 		this.Unknown2 = buffer.readUintLE(546,4)

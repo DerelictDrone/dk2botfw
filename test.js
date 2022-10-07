@@ -10,6 +10,20 @@ keepalive = Buffer.from("bf03","hex") //maybe keepalive? Host was sending this p
 // Client <= Player Names ff ff 48 (3 zeroes) 6b 02 17 00 (first letter of name)
 // Level Names ff ff (strlen) (3 zeroes) 69 (first letter of name)
 // Game config? ff ff 23 01 (2 zeroes) 6f 00 40 25 (see full packet dump)
+// KeepAlive mid-load ff ff 09 (3 zeroes) 0b 01 (3 zeroes) 01 (3 zeroes)
+// ALMOST ALL MID-GAME INFORMATION, NO OTHER DESIGNATIONS USED (other than 04 for chat messages) known THUS far
+// Update: ff ff 1f Server => Client on unknown information exactly? Each packet has an identifier which must be sent back with it
+	// Byte 13: Identifier, ticks up throughout the match, may get bigger later in the match, who knows.
+// Update fe ff 09 Client => Server, 
+	// Byte 3: Switches between 00 and 0F
+	// Byte 4: Keeper Identifier?
+	// Byte 13: Identifier, either start ticking up and send it back, or steal the server's one from the last packet received and send it back.
+	// Might lead to errors if this packet isn't.. accurate at all, meaning I MIGHT need to figure some dk2 code out and simulate it which is NOT GOOD NEWS
+	// Sent back 3 times in sequence, with one of them having Byte 3 set to 0F instead of 00
+	// * Every 4th packet might have it? It seems to shift down and when at the bottom, the next 3 response sequence won't have it entirely
+	// * The one after will have it at the top packet.
+// Update 2: ff ff 31 Both this and update 3 started getting sent after the other client FROZE so that MIGHT be related, idk yet
+// Update 3: ff ff 10
 
 // BF03 Game Config:
 // Byte 15:
@@ -41,10 +55,15 @@ keepalive = Buffer.from("bf03","hex") //maybe keepalive? Host was sending this p
 	// 3: Start
 
 chat = Buffer.from("bf04","hex")
+// Lobby:
 // Byte 5 = Player(00 = Red Keeper 01 = Blue Keeper etc. etc. 04 = Pink Keeper/System Message? 05 and up = Invisible to default client, still relayed by server.)
 // Byte 9 = String Length, Starts at 06, math for calculating length is (strlen*2)+6
 // Byte 15 = String Beginning(each character has one null character between)
 // Last 2 bytes after string are null characters, I.E one extra, empty space to terminate.
+// Ingame:
+// String format: "Username: Message", similar to lobby version, but 
+// Byte 19: Start of string
+//
 search = Buffer.from("bf05","hex")
 lobby = Buffer.from("bf06","hex")
 join = Buffer.from("bf07","hex")
@@ -56,7 +75,10 @@ goodbye = Buffer.from("bf0a","hex") // Client => Server notification of disconne
 //UID Starts at byte 45 or so.
 lobbystatus = Buffer.from("bf0b","hex")
 variablebox = Buffer.from("bf0c","hex") // I think this contains the creature settings and stuff under the lobby settings, I can't be sure though.
+gameloading = Buffer.from("bf0d","hex") // Sent when lobby succeeded and the game attempted to load,
 lobbyclose = Buffer.from("bf0f","hex") // Sent when lobby closed, I think..
+unknown1 = Buffer.from("bf10","hex") // Maybe when game began? Very short, payload only 44 bytes and mostly null.
+// Alternatively, loading progress! Sent from host to self, then sent to 
 
 keepalivepacket = Buffer.from("bf03000000000000050000006e00000000","hex")
 let keepaliveclientpacket = fs.readFileSync("keepalive_client.bin",{encoding: null})
@@ -141,7 +163,7 @@ sock.on('message',(d,rinfo)=>{
 		// UID is 16 bytes long
 		// POSSIBLY 52 BYTES LONG
 		clientState.UID = d.slice(16,16+52)
-		intervals['name_heartbeat'] = setInterval(()=>{sock.send(keepaliveclientpacket,rinfo.port,rinfo.address),2000})
+		intervals['name_heartbeat'] = setInterval(()=>{sock.send(keepaliveclientpacket,rinfo.port,rinfo.address),8000})
 		setTimeout(()=>{
 			sock.send(formMessagePacket("Hello World!",1))
 			setTimeout(()=>{
