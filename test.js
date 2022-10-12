@@ -11,10 +11,14 @@ keepalive = Buffer.from("bf03","hex") //maybe keepalive? Host was sending this p
 // Level Names ff ff (strlen) (3 zeroes) 69 (first letter of name)
 // Game config? ff ff 23 01 (2 zeroes) 6f 00 40 25 (see full packet dump)
 // KeepAlive mid-load ff ff 09 (3 zeroes) 0b 01 (3 zeroes) 01 (3 zeroes)
+	// Byte 3: Set to 0F when byte 13 set to 1F
+	// Byte 4: Keeper ID for whose loading status to update
+	// Byte 12 & 14: Unknown, 1F00 for loading progress, switches to 0B01 and then client sends back 0C01, 1F Probably start game packet
+	// Byte 17: Progress, for 1F00 goes from 0 to 0x21, for 0B01 is 01, 0C01 starts at F710
 // ALMOST ALL MID-GAME INFORMATION, NO OTHER DESIGNATIONS USED (other than 04 for chat messages) known THUS far
 // Update: ff ff 1f Server => Client on unknown information exactly? Each packet has an identifier which must be sent back with it
 	// Byte 13: Identifier, ticks up throughout the match, may get bigger later in the match, who knows.
-// Update fe ff 09 Client => Server, 
+// Update fe ff 09 Client <=> Server ack?
 	// Byte 3: Switches between 00 and 0F
 	// Byte 4: Keeper Identifier?
 	// Byte 13: Identifier, either start ticking up and send it back, or steal the server's one from the last packet received and send it back.
@@ -77,8 +81,9 @@ lobbystatus = Buffer.from("bf0b","hex")
 variablebox = Buffer.from("bf0c","hex") // I think this contains the creature settings and stuff under the lobby settings, I can't be sure though.
 gameloading = Buffer.from("bf0d","hex") // Sent when lobby succeeded and the game attempted to load,
 lobbyclose = Buffer.from("bf0f","hex") // Sent when lobby closed, I think..
-unknown1 = Buffer.from("bf10","hex") // Maybe when game began? Very short, payload only 44 bytes and mostly null.
-// Alternatively, loading progress! Sent from host to self, then sent to 
+loadbegin = Buffer.from("bf10","hex") // When the loading screen begins for everyone
+// Byte 5, 13, 15, 22, Keeper ID? All 0 in host, all 1 in client
+// Alternatively, loading progress! Sent from host to self, then sent to client
 
 keepalivepacket = Buffer.from("bf03000000000000050000006e00000000","hex")
 let keepaliveclientpacket = fs.readFileSync("keepalive_client.bin",{encoding: null})
@@ -119,6 +124,8 @@ if(process.argv[2] === "host") {
 }
 
 let disconnectpacket = fs.readFileSync("disconnect.bin",{encoding: null})
+
+let loadprogresspacket = fs.readFileSync('load_progress.bin',{encoding: null})
 
 let intervals = {}
 let clientState = {} // UID presently
@@ -176,7 +183,12 @@ sock.on('message',(d,rinfo)=>{
 		clearInterval(intervals["name_heartbeat"])
 	} else if(identifier === lobbyclose.toString()) {
 		console.log("Lobby Closed")
-	}else {
+	} else if(identifier === loadbegin.toString()) {
+		console.log('Load Begin!')
+	} else if(identifier === gameloading.toString()) {
+		console.log('Received game load packet!')
+		sentpacket = loadprogresspacket
+	} else {
 		console.log("Unknown: ",d.slice(0,2))
 	}
 	if(sentpacket != 0) {
